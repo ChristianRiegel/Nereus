@@ -15,6 +15,7 @@ import matplotlib.pyplot as plt
 from tabulate import tabulate
 
 ## Global variables
+version = 'v0.4'
 df_container = {'df':pd.DataFrame(), 'valid_file_read_in':False, 'df_numeric_columns':[], 'df_object_columns':[], 'separator':"", 'decimal':""}
 gui_container = {'dict_explanation_text_en':{
     'Histogram':'A Histogram displays the distribution of a single variable X. Numeric values should be chosen. By selecting a column of discrete labels for data sets (e.g. Countries), distributions for all values in this set are drawn in different colours. The number of bins is automatically chosen unless specified.',
@@ -56,22 +57,30 @@ def plot_selected():
     elif(hue_column not in df_container['df'].columns.values):
         print_to_terminal("Hue Column "+hue_column+" not found in data.")
 
+    # Debug, later to be added in plot window
+    gui_container['bool_common_norm'] = False
+    gui_container['bool_normalise'] = False
+    gui_container['statistic_type'] = ['count','frequency','probability','percent','percent'][0]
+    gui_container['bool_normalise'] = True
     if(plot_type=='Selection'):
         pass
     elif(plot_type=='Histogram'):
-        sns.histplot(data=df_container['df'], x=x_header_name, bins=n_bins, hue=hue_column)
+        sns.histplot(data=df_container['df'], x=x_header_name, bins=n_bins, hue=hue_column, palette="bright",
+        stat=gui_container['statistic_type'], common_norm=gui_container['bool_common_norm'], cumulative=gui_container['bool_normalise'])
     elif(plot_type=='Countplot'):
-        sns.histplot(data=df_container['df'], x=x_header_name,hue=hue_column)
+        sns.histplot(data=df_container['df'], x=x_header_name,hue=hue_column, palette="bright")
     elif(plot_type=='Pairplot'):
-        g = sns.pairplot(data = df_container['df'], hue=hue_column)
+        g = sns.pairplot(data = df_container['df'], hue=hue_column, palette="bright")
+        g.map_upper(plt.scatter)
+        g.map_lower(sns.kdeplot)
     elif(plot_type=='Jointplot'):
-        sns.jointplot(data=df_container['df'], x=x_header_name, y=y_header_name, hue=hue_column)
+        sns.jointplot(data=df_container['df'], x=x_header_name, y=y_header_name, hue=hue_column, palette="bright")
     elif(plot_type=='Boxplot'):
-        sns.boxplot(data=df_container['df'], x=x_header_name, y=y_header_name, hue=hue_column)
+        sns.boxplot(data=df_container['df'], x=x_header_name, y=y_header_name, hue=hue_column, palette="bright")
     elif(plot_type=='Lmplot'):
-        sns.lmplot(data=df_container['df'], x=x_header_name, y=y_header_name, hue=hue_column)
+        sns.lmplot(data=df_container['df'], x=x_header_name, y=y_header_name, hue=hue_column, palette="bright")
     elif(plot_type=='Violinplot'):
-        sns.violinplot(data=df_container['df'], x=x_header_name, y=y_header_name, hue=hue_column)
+        sns.violinplot(data=df_container['df'], x=x_header_name, y=y_header_name, hue=hue_column, palette="bright")
     plt.show()
 
 def prepare_child_window():
@@ -161,7 +170,20 @@ def print_to_terminal(string,clear=False):
     gui_container['textbox_terminal'].insert('end', string+'\n\n')
     gui_container['textbox_terminal'].config(state='disabled')
 
-def button_open_file():
+def click_button_select_file():
+    global gui_container
+    global df_container
+
+    filename = fd.askopenfilename(title='Open a file',initialdir='.',filetypes=(('CSV', '*.csv'),('All files', '*.*')))
+    df_container['selected_file'] = filename
+    print_to_terminal("File "+filename+" selected.",True)
+
+    gui_container['textbox_filepath'].config(state='normal')
+    gui_container['textbox_filepath'].delete(1.0,'end')
+    gui_container['textbox_filepath'].insert('end', filename)
+    gui_container['textbox_filepath'].config(state='disabled')
+
+def click_button_open_file():
     global gui_container
     global df_container
 
@@ -169,7 +191,9 @@ def button_open_file():
     df_container['df_numeric_columns'] = []
     df_container['df_object_columns'] = []
 
-    filename = fd.askopenfilename(title='Open a file',initialdir='.',filetypes=(('CSV', '*.csv'),('All files', '*.*')))
+    filename = df_container['selected_file']
+
+    #filename = fd.askopenfilename(title='Open a file',initialdir='.',filetypes=(('CSV', '*.csv'),('All files', '*.*')))
     try:
         df_container['df'] = pd.read_csv(filename, sep=df_container['separator'], decimal=df_container['decimal'])
         print_to_terminal("File "+filename+" read in.",True)
@@ -196,15 +220,16 @@ def gui_init():
     global gui_container
     gui_container['radio_decimal_point'].invoke()
     gui_container['radio_separator_semicolon'].invoke()
+    df_container['selected_file'] = ""
 
-def button_open_plot_options():
+def click_button_open_plot_options():
     global df_container
     if df_container['valid_file_read_in']:
         prepare_child_window()
     else:
         print_to_terminal("\nNo numerical data read in. Maybe try a different separator or decimal sign.")
 
-def buttonClickQuit():
+def click_button_exit():
     global gui_container
     gui_container['window'].quit()
     gui_container['window'].destroy()
@@ -217,14 +242,16 @@ def change_radio():
 ## Section defining the gui
 gui_container['window'] = tk.Tk()
 gui_container['window'].title('Window title')
-gui_container['window'].geometry('580x700')
-#gui_container['window'].config(bg='#21A8BB')
+gui_container['window'].geometry('580x750')
 
 y_position = 5   # coordinate for vertical positioning
 gui_container['message_instructions'] = tk.Message(gui_container['window'],anchor='nw', width = 580,
-text="Welcome to Nereus, the CSV plotting tool!\n\nUsage:\n(1)\tSpecify decimal sign and separator below\n(2)\tOpen file\n(3)\tThe first ten rows as imported are shown.\n\tCorrect decimal sign or separator if necessary\n(4)\tSelect plot type (default: Histogram)\n(5)\tOpen plot options\n(>5)\tRepeat steps 4 & 5 for the same file, if desired")
+text="Welcome to Nereus, the CSV plotting tool!\n\nUsage:\n(1)\tSpecify decimal sign and separator below\n(2)\tSelect file\n(3)\tOpen selected file\n(4)\tThe first ten rows as imported are shown\n\tCorrect decimal sign or separator if necessary and repeat (3) and (4)\n(5)\tSelect plot type (default: Histogram)\n(6)\tOpen plot options\n(>6)\tRepeat steps 5 & 6 for the same file, if desired")
 gui_container['message_instructions'].place(x=5,y=y_position)
-y_position += 180
+
+gui_container['message_version'] = tk.Message(gui_container['window'],anchor='ne', width = 60, text=version)
+gui_container['message_version'].place(x=520,y=y_position)
+y_position += 200
 
 var_decimal_sign = tk.StringVar()
 var_separator_sign = tk.StringVar()
@@ -252,8 +279,17 @@ gui_container['radio_separator_tab'] = tk.Radiobutton(gui_container['window'], t
 gui_container['radio_separator_tab'].place(x=305, y=y_position)
 y_position += 30
 
-gui_container['button_plot'] = tk.Button(gui_container['window'],text="Open file",command=button_open_file, height = 1, width = 7)
-gui_container['button_plot'].place(x=5, y=y_position)
+gui_container['button_select_file'] = tk.Button(gui_container['window'],text="Select file",command=click_button_select_file, height = 1, width = 7)
+gui_container['button_select_file'].place(x=5, y=y_position)
+
+gui_container['textbox_filepath'] = tk.Text(gui_container['window'], height= 1, width=70,wrap=tk.NONE)
+gui_container['textbox_filepath'].place(x=75,y=y_position)
+#gui_container['textbox_filepath'].insert('end', "")
+gui_container['textbox_filepath'].config(state='disabled')
+y_position += 30
+
+gui_container['button_open_file'] = tk.Button(gui_container['window'],text="Open file",command=click_button_open_file, height = 1, width = 7)
+gui_container['button_open_file'].place(x=5, y=y_position)
 
 var_plottype = tk.StringVar()
 var_plottype.set("Histogram")
@@ -263,10 +299,10 @@ gui_container['optionmenu_plottype'] = tk.OptionMenu(gui_container['window'],var
 gui_container['optionmenu_plottype'].config( height= 1, width=13)
 gui_container['optionmenu_plottype'].place(x=75, y=y_position-2)
 
-gui_container['button_plot'] = tk.Button(gui_container['window'],text="Open plot options",command=button_open_plot_options, height = 1, width = 15, bg='blue', activebackground='yellow')
-gui_container['button_plot'].place(x=230, y=y_position)
+gui_container['button_plot_options'] = tk.Button(gui_container['window'],text="Open plot options",command=click_button_open_plot_options, height = 1, width = 15, activebackground='yellow')
+gui_container['button_plot_options'].place(x=230, y=y_position)
 
-gui_container['button_exit'] = tk.Button(gui_container['window'], text = "Exit GUI", command = buttonClickQuit, height = 1, width = 10)
+gui_container['button_exit'] = tk.Button(gui_container['window'], text = "Exit GUI", command = click_button_exit, height = 1, width = 10)
 gui_container['button_exit'].place(x=375, y=y_position)
 y_position += 30
 
