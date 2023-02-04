@@ -3,21 +3,22 @@
 # Nereus was the son of Pontus and Gaia and was believed to be the god of the fish.
 # Open CSV data by selecting decimal sign and separator char,
 # Plot different seaborn plot types
-# Version 0.3
-# January 21, 2023
+# Version 0.5
+# February 04, 2023
 #############################################
 import tkinter.filedialog as fd
 import tkinter as tk
-import sys
+import os
 import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
 from tabulate import tabulate
 
 ## Global variables
-version = 'v0.4'
+version = 'v0.5'
 df_container = {'df':pd.DataFrame(), 'valid_file_read_in':False, 'df_numeric_columns':[], 'df_object_columns':[], 'separator':"", 'decimal':""}
-gui_container = {'dict_explanation_text_en':{
+gui_container = {'selected_path':'/.',
+    'dict_explanation_text_en':{
     'Histogram':'A Histogram displays the distribution of a single variable X. Numeric values should be chosen. By selecting a column of discrete labels for data sets (e.g. Countries), distributions for all values in this set are drawn in different colours. The number of bins is automatically chosen unless specified.',
     'Countplot':'A Countplot displays the total count of each value in a data column X. Category values should be chosen. By selecting a column of discrete labels for data sets (e.g. Countries), distributions for all values in this set are drawn in different colours.',
     'Pairplot':'A Pairplot displays an NxN grid if the data contains N columns with numeric values.The grid then contains histograms on the diagonal and correlations plots on the off-diagonal spaces. No X-column or Y-column need to be specified. By selecting a column of discrete labels for data sets(e.g. Countries), distributions for all values in this set are drawn in different colours.',
@@ -34,6 +35,7 @@ def plot_selected():
     x_header_name = gui_container['var_column_x'].get()
     y_header_name = gui_container['var_column_y'].get()
     hue_column  = gui_container['var_column_hue'].get()
+    stat_type = gui_container['var_normalization_type'].get()
 
     n_bins = 'auto'
     if gui_container['entry_bins'].get().isdigit():
@@ -57,16 +59,12 @@ def plot_selected():
     elif(hue_column not in df_container['df'].columns.values):
         print_to_terminal("Hue Column "+hue_column+" not found in data.")
 
-    # Debug, later to be added in plot window
-    gui_container['bool_common_norm'] = False
-    gui_container['bool_normalise'] = False
-    gui_container['statistic_type'] = ['count','frequency','probability','percent','percent'][0]
-    gui_container['bool_normalise'] = True
     if(plot_type=='Selection'):
         pass
     elif(plot_type=='Histogram'):
         sns.histplot(data=df_container['df'], x=x_header_name, bins=n_bins, hue=hue_column, palette="bright",
-        stat=gui_container['statistic_type'], common_norm=gui_container['bool_common_norm'], cumulative=gui_container['bool_normalise'])
+        stat=stat_type, common_norm=gui_container['var_common_norm'].get(), cumulative=gui_container['var_cumulative'].get(),
+        multiple=gui_container['var_multiple_style'].get())
     elif(plot_type=='Countplot'):
         sns.histplot(data=df_container['df'], x=x_header_name,hue=hue_column, palette="bright")
     elif(plot_type=='Pairplot'):
@@ -88,10 +86,9 @@ def prepare_child_window():
     global df_container
 
     plot_type_label = var_plottype.get()
-
     gui_container['child_window'] = tk.Toplevel(gui_container['window'])
     gui_container['child_window'].title(plot_type_label+' window')
-    gui_container['child_window'].geometry('355x180')
+    gui_container['child_window'].geometry('370x180')
     gui_container['child_window'].geometry('+600+0')
     gui_container['child_window'].grab_set()
     y_position = 10
@@ -100,6 +97,8 @@ def prepare_child_window():
     gui_container['array_df_headers_numeric']    = df_container['df_numeric_columns']
     gui_container['array_df_headers_and_None']         = ["None"]
     gui_container['array_df_headers_numeric_and_None'] = ["None"]
+    gui_container['array_df_statistic_types'] = ['count','frequency','probability','density']
+    gui_container['array_df_multiple_styles'] = ['layer','dodge','stack','fill']
 
     for column in gui_container['array_df_headers']:
         gui_container['array_df_headers_and_None'].append(column)
@@ -145,10 +144,33 @@ def prepare_child_window():
         y_position += 30
 
     gui_container['entry_bins'] = tk.Entry(gui_container['child_window'], width = 10)
+    gui_container['var_multiple_style'] = tk.StringVar()
+    gui_container['var_multiple_style'].set(gui_container['array_df_multiple_styles'][0])
+    gui_container['var_normalization_type'] = tk.StringVar()
+    gui_container['var_normalization_type'].set(gui_container['array_df_statistic_types'][0])
+    gui_container['var_common_norm'] = tk.IntVar()
+    gui_container['var_common_norm'].set(0)
+    gui_container['var_cumulative'] = tk.IntVar()
+    gui_container['var_cumulative'].set(0)
     if(plot_type_label in ['Histogram']):
+        gui_container['label_multiple'] = tk.Label(gui_container['child_window'], text = "Style for data sets:")
+        gui_container['label_multiple'].place(x=5, y=y_position)
+        gui_container['optionmenu_multiple'] = tk.OptionMenu(gui_container['child_window'],gui_container['var_multiple_style'],*gui_container['array_df_multiple_styles'])
+        gui_container['optionmenu_multiple'].place(x=205, y=y_position)
+        y_position += 30
         gui_container['label_bins'] = tk.Label(gui_container['child_window'], text = "Number of bins (optional):")
         gui_container['label_bins'].place(x=5, y=y_position)
         gui_container['entry_bins'].place(x=205, y=y_position)
+        y_position += 30
+        gui_container['label_normalization'] = tk.Label(gui_container['child_window'], text = "Select Normalization:")
+        gui_container['label_normalization'].place(x=5, y=y_position)
+        gui_container['optionmenu_normalization'] = tk.OptionMenu(gui_container['child_window'],gui_container['var_normalization_type'],*gui_container['array_df_statistic_types'])
+        gui_container['optionmenu_normalization'].place(x=205, y=y_position)
+        y_position += 30
+        gui_container['checkbutton_common_norm'] = tk.Checkbutton(gui_container['child_window'], text='Global normalisation',variable=gui_container['var_common_norm'], onvalue=1, offvalue=0)
+        gui_container['checkbutton_common_norm'].place(x=5, y=y_position)
+        gui_container['checkbutton_cumulative'] = tk.Checkbutton(gui_container['child_window'], text='Cumulative Histogram',variable=gui_container['var_cumulative'], onvalue=1, offvalue=0)
+        gui_container['checkbutton_cumulative'].place(x=180, y=y_position)
         y_position += 30
 
     gui_container['button_plot'] = tk.Button(gui_container['child_window'],text="Plot "+plot_type_label,command=plot_selected, height = 1, width = 15)
@@ -174,8 +196,9 @@ def click_button_select_file():
     global gui_container
     global df_container
 
-    filename = fd.askopenfilename(title='Open a file',initialdir='.',filetypes=(('CSV', '*.csv'),('All files', '*.*')))
+    filename = fd.askopenfilename(title='Open a file',initialdir=gui_container['selected_path'],filetypes=(('CSV', '*.csv'),('All files', '*.*')))
     df_container['selected_file'] = filename
+    df_container['selected_path'] = os.path.dirname(os.path.abspath(filename))
     print_to_terminal("File "+filename+" selected.",True)
 
     gui_container['textbox_filepath'].config(state='normal')
@@ -190,12 +213,13 @@ def click_button_open_file():
     df_container['df'] = None
     df_container['df_numeric_columns'] = []
     df_container['df_object_columns'] = []
-
     filename = df_container['selected_file']
-
-    #filename = fd.askopenfilename(title='Open a file',initialdir='.',filetypes=(('CSV', '*.csv'),('All files', '*.*')))
     try:
-        df_container['df'] = pd.read_csv(filename, sep=df_container['separator'], decimal=df_container['decimal'])
+        if(df_container['has_header']):
+            df_container['df'] = pd.read_csv(filename, sep=df_container['separator'], decimal=df_container['decimal'])
+        else:
+             df_container['df'] = pd.read_csv(filename, sep=df_container['separator'], decimal=df_container['decimal'],header=None)
+             df_container['df'].columns = ['Column'+str(x) for x in range(len(df_container['df'].columns))]
         print_to_terminal("File "+filename+" read in.",True)
         print_to_terminal("Here are the first ten rows as imported:",False)
         print_to_terminal(tabulate(df_container['df'].head(10),headers=list(df_container['df'].columns),showindex=False,tablefmt="presto"),False)
@@ -204,13 +228,11 @@ def click_button_open_file():
                 df_container['df_numeric_columns'].append(column)
             if df_container['df'][column].dtype.kind in 'biuOSUV':
                 df_container['df_object_columns'].append(column)
-
         if len(df_container['df_numeric_columns']) <1:
             print_to_terminal("\nNo numerical data read in. Maybe try a different separator or decimal sign.")
             df_container['valid_file_read_in'] = False
         else:
             df_container['valid_file_read_in'] = True
-
     except:
        print_to_terminal("\nFile "+filename+" could not be read in.")
        df_container['valid_file_read_in'] = False
@@ -218,8 +240,10 @@ def click_button_open_file():
 ## Gui functions
 def gui_init():
     global gui_container
+    gui_container['selected_path'] = os.getcwd()
     gui_container['radio_decimal_point'].invoke()
     gui_container['radio_separator_semicolon'].invoke()
+    gui_container['checkbutton_has_header'].invoke()
     df_container['selected_file'] = ""
 
 def click_button_open_plot_options():
@@ -238,6 +262,7 @@ def change_radio():
     global df_container
     df_container['decimal'] = var_decimal_sign.get()
     df_container['separator'] = var_separator_sign.get()
+    df_container['has_header'] = var_has_header.get()
 
 ## Section defining the gui
 gui_container['window'] = tk.Tk()
@@ -255,6 +280,14 @@ y_position += 200
 
 var_decimal_sign = tk.StringVar()
 var_separator_sign = tk.StringVar()
+var_has_header = tk.IntVar()
+
+gui_container['label_has_header'] = tk.Label(gui_container['window'], text = "CSV file contains a header:")
+gui_container['label_has_header'].place(x=5, y=y_position)
+
+gui_container['checkbutton_has_header'] = tk.Checkbutton(gui_container['window'], text='',variable=var_has_header, onvalue=1, offvalue=0, command=change_radio)
+gui_container['checkbutton_has_header'].place(x=205, y=y_position)
+y_position += 30
 
 gui_container['label_decimal'] = tk.Label(gui_container['window'], text = "Decimal sign used in the CSV:")
 gui_container['label_decimal'].place(x=5, y=y_position)
@@ -277,6 +310,9 @@ gui_container['radio_separator_comma'].place(x=255, y=y_position)
 
 gui_container['radio_separator_tab'] = tk.Radiobutton(gui_container['window'], text="TAB", var = var_separator_sign, value = "\t", command=change_radio)
 gui_container['radio_separator_tab'].place(x=305, y=y_position)
+
+gui_container['radio_separator_tab'] = tk.Radiobutton(gui_container['window'], text="Whitespace", var = var_separator_sign, value = " ", command=change_radio)
+gui_container['radio_separator_tab'].place(x=355, y=y_position)
 y_position += 30
 
 gui_container['button_select_file'] = tk.Button(gui_container['window'],text="Select file",command=click_button_select_file, height = 1, width = 7)
